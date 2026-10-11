@@ -1,0 +1,2 @@
+# Account Takeover Escalation Policy
+Escalate or request trusted-channel verification when multiple independent account-takeover indicators align, including a previously unseen device, a newly added beneficiary, unusual transaction velocity, geographic deviation, or a material amount anomaly. A single indicator should not be treated as proof of fraud. The analyst must review contradictory context before a final decision.
