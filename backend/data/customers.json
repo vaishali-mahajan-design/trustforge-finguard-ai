@@ -1,0 +1,4 @@
+[
+  {"customer_id":"CUST-001","home_city":"Mumbai","home_country":"India","known_devices":["iphone-known-11"],"known_beneficiaries":["BEN-001","BEN-002"],"travel_notifications":[],"international_transactions_last_90d":0,"historical_transaction_amounts":[12000,22000,9800,18500,22200]},
+  {"customer_id":"CUST-002","home_city":"Mumbai","home_country":"India","known_devices":["iphone-known-22"],"known_beneficiaries":["MERCHANT-HOTEL-1"],"travel_notifications":[{"country":"Singapore","active":true,"from":"2026-10-05","to":"2026-10-12"}],"international_transactions_last_90d":4,"historical_transaction_amounts":[18000,24000,32000,28000,35000]}
+]
