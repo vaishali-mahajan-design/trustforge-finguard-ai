@@ -9,6 +9,23 @@ FinGuard AI is a human-in-the-loop fraud investigation copilot by **TrustForge**
 - `backend/` — FastAPI API, synthetic case data, evidence tools, policy retrieval, Gemini integration, tests and Cloud Run Dockerfile.
 - `frontend/` — React/TypeScript workstream (teammate builds here).
 
+## Python version (important)
+
+**Use Python 3.12** for local development (the Cloud Run Dockerfile also uses Python 3.12). macOS Command Line Tools may supply Python 3.9 by default, which fails on annotations such as `str | None`.
+
+On macOS with Homebrew:
+
+```bash
+brew install python@3.12
+cd backend
+# If a Python 3.9 virtual environment was already created:
+deactivate  # only if a venv is active
+rm -rf .venv
+python3.12 -m venv .venv
+source .venv/bin/activate
+python --version  # should show 3.12.x
+```
+
 ## Run the backend locally
 
 ```bash
