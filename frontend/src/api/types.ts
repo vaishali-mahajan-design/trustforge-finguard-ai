@@ -50,6 +50,52 @@ export interface Hypothesis {
   missing_evidence: string[]
 }
 
+/** Optional 2.0 fields. Rendered only when supplied by the investigation API. */
+export interface CheckableCondition {
+  condition: string
+  checkable_facts: string[]
+  evidence_ids?: string[]
+  check_id?: string
+}
+
+export interface AlternativeAction {
+  action: string
+  rationale: string
+  rejection_reason: string
+}
+
+export interface InvestigationCheck {
+  check_id: string
+  title: string
+  status: 'AVAILABLE' | 'COMPLETED' | 'FAILED' | 'SKIPPED'
+  rank: number
+  expected_information_gain: number
+  investigation_cost: number
+  customer_friction: number
+  ranking_reason?: string
+  result?: string
+  evidence_ids?: string[]
+}
+
+export interface AssessmentSnapshot {
+  recorded_at: string
+  primary_hypothesis: string
+  alternative_hypotheses: string[]
+  remaining_uncertainties: string[]
+  recommended_action: Action
+  next_best_action: string
+}
+
+export interface AuditTrailEvent {
+  event_id: string
+  occurred_at: string
+  event_type: string
+  description: string
+  actor?: string
+  evidence_ids?: string[]
+  check_id?: string
+}
+
 export interface Analysis {
   summary: string
   primary_hypothesis: Hypothesis
@@ -59,6 +105,9 @@ export interface Analysis {
   recommended_reason: string
   next_best_action: string
   policy_basis: string[]
+  flips_to_legitimate?: CheckableCondition[]
+  flips_to_fraud?: CheckableCondition[]
+  alternatives_considered?: AlternativeAction[]
 }
 
 export interface Investigation {
@@ -69,6 +118,9 @@ export interface Investigation {
   analysis: Analysis
   model_used: string
   ai_mode: string
+  ranked_checks?: InvestigationCheck[]
+  assessment_history?: AssessmentSnapshot[]
+  audit_trail?: AuditTrailEvent[]
 }
 
 export interface AnalystDecision {

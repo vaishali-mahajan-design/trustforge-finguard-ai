@@ -29,3 +29,15 @@ Configure the backend's `CORS_ORIGINS` to include the deployed frontend origin. 
 ## Demo behavior
 
 The report labels the backend's `ai_mode` and `model_used`; mock output is explicitly identified as demo analysis. AI recommendations only preselect the analyst decision control. The analyst must choose or confirm an action, identify themselves, and enter a rationale before submitting. Backend investigation and decision history is in memory and can disappear after a restart.
+
+## Optional 2.0 report fields
+
+The report UI is ready to display these optional API additions while continuing to render responses from the current API:
+
+- `analysis.flips_to_legitimate` and `analysis.flips_to_fraud`: conditions with a `condition`, `checkable_facts`, and optional `check_id` / `evidence_ids`.
+- `analysis.alternatives_considered`: action, rationale, and why the alternative was rejected.
+- `ranked_checks`: backend-supplied rank, status, information gain, investigation cost, customer friction, result, and evidence references. The frontend displays the rank and scores; it does not calculate them or claim a check ran.
+- `assessment_history`: timestamped earlier and current hypotheses, uncertainties, and next-best actions.
+- `audit_trail`: timestamped events with descriptions and optional actor, check, and evidence references.
+
+These are frontend-ready optional types, not a claim that the current backend returns or persists these fields. Agree on exact names, units, and status values with the backend owner before they implement the response schema.

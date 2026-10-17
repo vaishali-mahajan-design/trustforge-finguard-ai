@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { api } from './api/client'
-import type { Action, AlertDetail, AlertSummary, AnalystDecision, EvidenceItem, Investigation, Transaction } from './api/types'
+import type { Action, AlertDetail, AlertSummary, AnalystDecision, Analysis, EvidenceItem, Investigation, Transaction } from './api/types'
 
 const currency = (amount: number, code = 'INR') => new Intl.NumberFormat('en-IN', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(amount)
 const dateTime = (value: string) => new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -22,11 +22,17 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     pulse: <><path d="M3 12h4l3-8 4 16 3-8h4"/></>,
     close: <><path d="m18 6-12 12M6 6l12 12"/></>,
     lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></>,
+    moon: <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.7 8.7 0 1 0 11 11Z"/>,
+    sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></>,
   }
   return <svg {...common}>{paths[name] ?? paths.alert}</svg>
 }
 
 function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try { return localStorage.getItem('finguard-theme') === 'dark' ? 'dark' : 'light' }
+    catch { return 'light' }
+  })
   const [alerts, setAlerts] = useState<AlertSummary[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [detail, setDetail] = useState<AlertDetail | null>(null)
@@ -44,6 +50,11 @@ function App() {
   const [analyst, setAnalyst] = useState('demo-analyst')
   const [apiOnline, setApiOnline] = useState<boolean | null>(null)
   const [activeView, setActiveView] = useState<'dashboard' | 'alerts'>('dashboard')
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try { localStorage.setItem('finguard-theme', theme) } catch { /* Theme still applies for this session. */ }
+  }, [theme])
 
   const loadAlerts = useCallback(async () => {
     setLoadingQueue(true); setError('')
@@ -102,7 +113,7 @@ function App() {
         <a className={`nav-link ${activeView === 'dashboard' ? 'active' : ''}`} href="#dashboard" onClick={() => setActiveView('dashboard')}><Icon name="grid"/>Overview</a>
         <a className={`nav-link ${activeView === 'alerts' ? 'active' : ''}`} href="#alerts" onClick={() => setActiveView('alerts')}><span className="nav-icon"><Icon name="alert"/></span>Alert queue<span className="nav-count">{alerts.filter((a) => a.status === 'OPEN').length}</span></a>
       </nav>
-      <div className="sidebar-bottom"><div className="environment"><span className={`status-dot ${apiOnline ? 'online' : apiOnline === false ? 'offline' : ''}`}/><span><b>{apiOnline ? 'API connected' : apiOnline === false ? 'API disconnected' : 'Connecting'}</b><small>Local environment</small></span></div><div className="analyst"><div className="avatar">DA</div><span><b>Demo Analyst</b><small>Fraud operations</small></span><button className="plain-icon" title="Analyst profile" aria-label="Analyst profile"><span>•••</span></button></div></div>
+      <div className="sidebar-bottom"><div className="environment"><span className={`status-dot ${apiOnline ? 'online' : apiOnline === false ? 'offline' : ''}`}/><span><b>{apiOnline ? 'API connected' : apiOnline === false ? 'API disconnected' : 'Connecting'}</b><small>Local environment</small></span></div><div className="analyst"><div className="avatar">DA</div><span><b>Demo Analyst</b><small>Fraud operations</small></span><button className="plain-icon" title="Analyst profile" aria-label="Analyst profile"><span>•••</span></button></div><button className="theme-toggle" onClick={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16}/><span>{theme === 'light' ? 'Dark theme' : 'Light theme'}</span><span className="theme-key">{theme === 'light' ? 'OFF' : 'ON'}</span></button></div>
     </aside>
 
     <main className="main-area">
@@ -195,6 +206,11 @@ function InvestigationReport({ investigation, action, rationale, analyst, decisi
     <div className="report-section"><SectionTitle title="Evidence signals" trailing={`${investigation.evidence.length} signals`}/><div className="evidence-list">{investigation.evidence.map((item) => <EvidenceCard key={item.evidence_id} item={item}/>)}</div></div>
     <div className="report-section"><SectionTitle title="Hypothesis assessment" trailing="AI-assisted · analyst owned"/><HypothesisCard hypothesis={analysis.primary_hypothesis} evidenceById={evidenceById} primary/><div className="hypothesis-alternatives">{analysis.alternative_hypotheses.map((hypothesis, index) => <HypothesisCard key={`${hypothesis.name}-${index}`} hypothesis={hypothesis} evidenceById={evidenceById}/>)}</div></div>
     <div className="insight-grid"><div className="insight-card"><span className="insight-icon blue"><Icon name="refresh" size={15}/></span><div><span className="block-label">COUNTERFACTUAL</span><p>{analysis.counterfactual}</p></div></div><div className="insight-card"><span className="insight-icon green"><Icon name="arrow" size={15}/></span><div><span className="block-label">RECOMMENDED NEXT STEP</span><p>{analysis.next_best_action}</p></div></div></div>
+    {(analysis.flips_to_legitimate?.length || analysis.flips_to_fraud?.length) ? <CounterfactualConditions legitimate={analysis.flips_to_legitimate ?? []} fraud={analysis.flips_to_fraud ?? []}/> : null}
+    {analysis.alternatives_considered?.length ? <AlternativeActions actions={analysis.alternatives_considered}/> : null}
+    {investigation.ranked_checks?.length ? <RankedChecks checks={investigation.ranked_checks}/> : null}
+    {investigation.assessment_history && investigation.assessment_history.length > 1 ? <AssessmentChanges history={investigation.assessment_history}/> : null}
+    {investigation.audit_trail?.length ? <AuditTrail events={investigation.audit_trail}/> : null}
     <div className="report-section"><SectionTitle title="Policy basis" trailing={`${investigation.policy_matches.length} references`}/>{investigation.policy_matches.length ? <div className="policy-list">{investigation.policy_matches.map((policy) => <article className="policy-card" key={policy.policy_id}><div className="policy-head"><span className="policy-id">{policy.policy_id}</span><strong>{policy.title}</strong></div><p>{policy.excerpt}</p><div className="term-list">{policy.matched_terms.map((term) => <span key={term}>{term}</span>)}</div></article>)}</div> : <p className="muted-copy">No policy matches were returned for this investigation.</p>}</div>
     <div className="decision-section"><div className="decision-heading"><div><span className="decision-overline">HUMAN REVIEW</span><h3>Record your decision</h3></div><span className="human-only"><Icon name="lock" size={13}/> Analyst confirmation required</span></div>{decision ? <div className="decision-success" role="status"><span className="success-check"><Icon name="check" size={17}/></span><span><b>Decision recorded: {actionLabel[decision.action]}</b><small>{decision.analyst} · {dateTime(decision.decided_at)}</small><small>{decision.rationale}</small></span></div> : <form onSubmit={onSubmit} className="decision-form"><label>Decision<select value={action} onChange={(e) => onAction(e.target.value as Action)}><option value="ESCALATE">Escalate case</option><option value="REQUEST_VERIFICATION">Request verification</option><option value="CLEAR">Clear alert</option></select><span className="recommended-hint">AI recommendation: {actionLabel[analysis.recommended_action]} · confirm or change</span></label><label>Analyst ID<input value={analyst} onChange={(e) => onAnalyst(e.target.value)} required maxLength={80}/></label><label className="rationale-field">Rationale<textarea value={rationale} onChange={(e) => onRationale(e.target.value)} minLength={3} maxLength={1000} rows={3} placeholder="Document the evidence behind your decision…" required/><span className="char-count">{rationale.length}/1000</span></label><div className="decision-submit"><span><Icon name="lock" size={13}/> This action will be recorded in the case history.</span><button type="submit" className="button button-dark" disabled={submitting || rationale.trim().length < 3 || !analyst.trim()}>{submitting ? 'Saving decision…' : 'Confirm decision'}<Icon name="arrow" size={14}/></button></div></form>}</div>
   </section>
@@ -213,6 +229,37 @@ function HypothesisCard({ hypothesis, evidenceById, primary = false }: { hypothe
 
 function EvidenceRefs({ label, ids, evidenceById, tone }: { label: string; ids: string[]; evidenceById: Map<string, EvidenceItem>; tone: string }) {
   return <div className={`evidence-refs ${tone}`}><span>{label}</span>{ids.length ? ids.map((id) => <span className="evidence-ref-chip" key={id} title={evidenceById.get(id)?.statement ?? id}>{id}</span>) : <em>None identified</em>}</div>
+}
+
+function CounterfactualConditions({ legitimate, fraud }: { legitimate: NonNullable<Analysis['flips_to_legitimate']>; fraud: NonNullable<Analysis['flips_to_fraud']> }) {
+  return <div className="report-section"><SectionTitle title="What would change the assessment" trailing="Checkable conditions"/><div className="condition-grid"><ConditionList title="Evidence favoring legitimate activity" conditions={legitimate} tone="legitimate"/><ConditionList title="Evidence favoring fraud" conditions={fraud} tone="fraud"/></div></div>
+}
+
+function ConditionList({ title, conditions, tone }: { title: string; conditions: NonNullable<Analysis['flips_to_legitimate']>; tone: string }) {
+  return <article className={`condition-card ${tone}`}><h4>{title}</h4>{conditions.length ? <ol>{conditions.map((condition, index) => <li key={`${condition.condition}-${index}`}><b>{condition.condition}</b>{condition.check_id && <span className="condition-check-id">Check {condition.check_id}</span>}<span>Confirm these facts:</span><ul>{condition.checkable_facts.map((fact) => <li key={fact}>{fact}</li>)}</ul>{condition.evidence_ids?.length ? <EvidenceRefs label="Evidence" ids={condition.evidence_ids} evidenceById={new Map()} tone="support"/> : null}</li>)}</ol> : <p>No conditions returned.</p>}</article>
+}
+
+function AlternativeActions({ actions }: { actions: NonNullable<Analysis['alternatives_considered']> }) {
+  return <div className="report-section"><SectionTitle title="Other actions considered" trailing={`${actions.length} alternatives`}/><div className="alternative-action-list">{actions.map((item, index) => <article className="alternative-action" key={`${item.action}-${index}`}><span className="alternative-number">0{index + 1}</span><div><h4>{titleCase(item.action)}</h4><p>{item.rationale}</p><span><b>Why not selected:</b> {item.rejection_reason}</span></div></article>)}</div></div>
+}
+
+function RankedChecks({ checks }: { checks: NonNullable<Investigation['ranked_checks']> }) {
+  const ordered = [...checks].sort((a, b) => a.rank - b.rank)
+  return <div className="report-section"><SectionTitle title="Investigation checks" trailing="Backend-ranked"/><div className="check-list">{ordered.map((check) => <article className="check-card" key={check.check_id}><div className="check-rank">{check.rank}</div><div className="check-copy"><div className="check-title"><h4>{check.title}</h4><span className={`check-status ${check.status.toLowerCase()}`}>{titleCase(check.status)}</span></div><div className="check-dimensions"><span>Information gain <b>{check.expected_information_gain}</b></span><span>Investigation cost <b>{check.investigation_cost}</b></span><span>Customer friction <b>{check.customer_friction}</b></span></div>{check.ranking_reason && <p>{check.ranking_reason}</p>}{check.result && <div className="check-result"><b>Result</b><span>{check.result}</span></div>}{check.evidence_ids?.length ? <EvidenceRefs label="Evidence" ids={check.evidence_ids} evidenceById={new Map()} tone="support"/> : null}</div></article>)}</div><p className="contract-note">Order and scores are supplied by the API; the frontend only displays them.</p></div>
+}
+
+function AssessmentChanges({ history }: { history: NonNullable<Investigation['assessment_history']> }) {
+  const before = history[0]
+  const after = history[history.length - 1]
+  return <div className="report-section"><SectionTitle title="Assessment changes" trailing={`${history.length} recorded assessments`}/><div className="assessment-compare"><AssessmentSnapshot label="Before" snapshot={before}/><span className="assessment-arrow"><Icon name="arrow" size={17}/></span><AssessmentSnapshot label="Current" snapshot={after}/></div></div>
+}
+
+function AssessmentSnapshot({ label, snapshot }: { label: string; snapshot: NonNullable<Investigation['assessment_history']>[number] }) {
+  return <article className="assessment-snapshot"><div className="snapshot-heading"><h4>{label} assessment</h4><span>{dateTime(snapshot.recorded_at)}</span></div><span className="snapshot-label">PRIMARY HYPOTHESIS</span><b className="snapshot-hypothesis">{snapshot.primary_hypothesis}</b><div className="snapshot-label">ALTERNATIVE HYPOTHESES</div>{snapshot.alternative_hypotheses.length ? <ul>{snapshot.alternative_hypotheses.map((item) => <li key={item}>{item}</li>)}</ul> : <p>None listed.</p>}<div className="snapshot-label">REMAINING UNCERTAINTIES</div>{snapshot.remaining_uncertainties.length ? <ul>{snapshot.remaining_uncertainties.map((item) => <li key={item}>{item}</li>)}</ul> : <p>None listed.</p>}<div className="snapshot-next"><span className="snapshot-label">NEXT ACTION</span><b>{snapshot.next_best_action}</b></div></article>
+}
+
+function AuditTrail({ events }: { events: NonNullable<Investigation['audit_trail']> }) {
+  return <div className="report-section"><SectionTitle title="Investigation record" trailing={`${events.length} events`}/><ol className="audit-timeline">{events.map((event) => <li key={event.event_id}><span className="audit-marker"/><div className="audit-event"><div><b>{titleCase(event.event_type)}</b><time>{dateTime(event.occurred_at)}</time></div><p>{event.description}</p><span className="audit-meta">{event.actor ? `By ${event.actor}` : null}{event.check_id ? ` · Check ${event.check_id}` : null}</span>{event.evidence_ids?.length ? <EvidenceRefs label="Evidence" ids={event.evidence_ids} evidenceById={new Map()} tone="support"/> : null}</div></li>)}</ol></div>
 }
 
 function QueueLoading() { return <div className="skeleton-list" aria-label="Loading alerts">{[0, 1, 2].map((n) => <div className="skeleton-row" key={n}><span className="skeleton circle"/><span className="skeleton-copy"><i/><i/><i/></span><span className="skeleton amount-skeleton"/></div>)}</div> }
