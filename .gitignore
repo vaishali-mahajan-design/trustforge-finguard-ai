@@ -11,3 +11,6 @@ coverage.xml
 htmlcov/
 *.log
 .env.local
+
+# Firebase local deployment cache
+.firebase/

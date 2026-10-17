@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .data_store import get_alert, load_alerts
 from .models import AlertSummary, AnalystDecision, AnalystDecisionRequest, InvestigationResponse
 from .orchestrator import investigate
+from .demo_guard import limit_live_investigations
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -30,7 +31,11 @@ def alert_detail(alert_id: str):
         raise HTTPException(status_code=404, detail="Alert not found")
     return alert
 
-@app.post("/api/v1/investigations/{alert_id}", response_model=InvestigationResponse)
+@app.post(
+    "/api/v1/investigations/{alert_id}",
+    response_model=InvestigationResponse,
+    dependencies=[Depends(limit_live_investigations)],
+)
 async def run_investigation(alert_id: str):
     try:
         result = await investigate(alert_id, settings)
