@@ -76,7 +76,7 @@ function makeGraph(report: InvestigationResponse, fullscreen = false): GraphMode
     ? Math.max(1, Math.ceil(evidence.length / 2), policies.length)
     : Math.max(1, evidence.length + policies.length);
   const rowGap = fullscreen ? 82 : ROW_GAP;
-  const rowCount = Math.max(1, transactions.length, sortedEntities.length, rightRowCount);
+  const rowCount = Math.max(1, transactions.length + 1, sortedEntities.length, rightRowCount);
   const height = fullscreen
     ? Math.max(440, rowCount * rowGap + 180)
     : Math.max(450, rowCount * ROW_GAP + 250);
@@ -113,7 +113,7 @@ function makeGraph(report: InvestigationResponse, fullscreen = false): GraphMode
   const alertNodeId = `alert:${report.alert.alert_id}`;
   const customerNodeId = `customer:${report.alert.customer_id}`;
   addNode({ id: alertNodeId, kind: 'alert', title: report.alert.alert_id, subtitle: 'Investigation alert', detail: `${report.alert.headline}\nAttempted amount: ${report.alert.currency} ${report.alert.attempted_amount.toLocaleString('en-IN')}`, source: 'Alert record', x: positions.alert.x, y: height / 2 - NODE_HEIGHT / 2 });
-  addNode({ id: customerNodeId, kind: 'customer', title: report.alert.customer_id, subtitle: 'Customer on alert record', detail: 'This customer ID is attached to the selected alert record. The graph makes no claims about other customers or cases.', source: 'Alert record', x: positions.customer.x, y: height / 2 - NODE_HEIGHT / 2 });
+  addNode({ id: customerNodeId, kind: 'customer', title: report.alert.customer_id, subtitle: 'Customer on alert record', detail: 'This customer ID is attached to the selected alert record. The graph makes no claims about other customers or cases.', source: 'Alert record', x: positions.customer.x, y: positions.transactions.y + transactions.length * rowGap + 8 });
   addEdge(alertNodeId, customerNodeId, 'raised for', 'record');
 
   transactions.forEach((transaction, index) => {
@@ -189,7 +189,7 @@ function makeGraph(report: InvestigationResponse, fullscreen = false): GraphMode
       detail: `${policy.excerpt}\nMatched terms: ${policy.matched_terms.join(', ') || 'Not provided'}`,
       source: 'Policy retrieval result',
       x: positions.policies.x,
-      y: positions.policies.y + index * rowGap,
+      y: positions.policies.y + (fullscreen ? index : evidence.length + index) * rowGap,
     });
     addEdge(alertNodeId, id, 'retrieved for case', 'policy');
   });
