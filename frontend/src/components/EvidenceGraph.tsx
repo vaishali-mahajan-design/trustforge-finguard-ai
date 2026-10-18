@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { CircleHelp, Network, X } from 'lucide-react';
+import { CircleHelp, Maximize2, Minimize2, Network, X } from 'lucide-react';
 import type { EvidenceItem, InvestigationResponse } from '../api/types';
 
 type NodeKind = 'alert' | 'customer' | 'transaction' | 'device' | 'location' | 'beneficiary' | 'evidence' | 'policy';
@@ -51,7 +51,7 @@ function shorten(value: string, max = 22): string {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-function makeGraph(report: InvestigationResponse): GraphModel {
+function makeGraph(report: InvestigationResponse, fullscreen = false): GraphModel {
   const transactions = report.alert.transactions;
   const evidence = report.evidence;
   const policies = report.policy_matches;
@@ -72,15 +72,30 @@ function makeGraph(report: InvestigationResponse): GraphModel {
   }
 
   const sortedEntities = [...entityRows.entries()].sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
-  const rightRowCount = Math.max(1, evidence.length + policies.length);
+  const rightRowCount = fullscreen
+    ? Math.max(1, Math.ceil(evidence.length / 2), policies.length)
+    : Math.max(1, evidence.length + policies.length);
+  const rowGap = fullscreen ? 82 : ROW_GAP;
   const rowCount = Math.max(1, transactions.length, sortedEntities.length, rightRowCount);
-  const height = Math.max(450, rowCount * ROW_GAP + 250);
-  const positions = {
+  const height = fullscreen
+    ? Math.max(440, rowCount * rowGap + 180)
+    : Math.max(450, rowCount * ROW_GAP + 250);
+  const positions = fullscreen ? {
+    alert: { x: 24, y: 56 },
+    customer: { x: 220, y: 56 },
+    transactions: { x: 220, y: 140 },
+    entities: { x: 420, y: 80 },
+    evidence: { x: 630, y: 80 },
+    evidenceSecond: { x: 800, y: 80 },
+    policies: { x: 990, y: 80 },
+  } : {
     alert: { x: 26, y: 56 },
     customer: { x: 220, y: 56 },
     transactions: { x: 220, y: 170 },
     entities: { x: 430, y: 100 },
     evidence: { x: 640, y: 70 },
+    evidenceSecond: { x: 640, y: 70 },
+    policies: { x: 640, y: 70 },
   };
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -112,7 +127,7 @@ function makeGraph(report: InvestigationResponse): GraphModel {
       detail: `${eventTime}\n${transaction.city}, ${transaction.country}\nDevice: ${transaction.device_id}${transaction.beneficiary_id ? `\nBeneficiary: ${transaction.beneficiary_id}` : ''}`,
       source: 'Transaction event record',
       x: positions.transactions.x,
-      y: positions.transactions.y + index * ROW_GAP,
+      y: positions.transactions.y + index * rowGap,
     });
     addEdge(alertNodeId, id, 'contains event', 'record');
     addEdge(id, `device:${transaction.device_id}`, 'used device', 'record');
@@ -129,7 +144,7 @@ function makeGraph(report: InvestigationResponse): GraphModel {
       detail: `Appears in: ${entity.transactionIds.join(', ')}\nThis node is deduplicated from exact matching values in the selected alert's transaction records.`,
       source: 'Transaction event record',
       x: positions.entities.x,
-      y: positions.entities.y + index * ROW_GAP,
+      y: positions.entities.y + index * rowGap,
     });
   });
 
@@ -155,8 +170,8 @@ function makeGraph(report: InvestigationResponse): GraphModel {
       detail: `${item.statement}\nValue: ${String(item.value)}`,
       source: item.source.replace(/_/g, ' '),
       severity: item.severity,
-      x: positions.evidence.x,
-      y: positions.evidence.y + index * ROW_GAP,
+      x: fullscreen && index % 2 ? positions.evidenceSecond.x : positions.evidence.x,
+      y: positions.evidence.y + (fullscreen ? Math.floor(index / 2) : index) * rowGap,
     });
     const targets = targetsForEvidence(item);
     (targets.length ? targets : [alertNodeId]).forEach((targetId) => {
@@ -173,14 +188,14 @@ function makeGraph(report: InvestigationResponse): GraphModel {
       subtitle: shorten(policy.title, 25),
       detail: `${policy.excerpt}\nMatched terms: ${policy.matched_terms.join(', ') || 'Not provided'}`,
       source: 'Policy retrieval result',
-      x: positions.evidence.x,
-      y: positions.evidence.y + (evidence.length + index) * ROW_GAP,
+      x: positions.policies.x,
+      y: positions.policies.y + index * rowGap,
     });
     addEdge(alertNodeId, id, 'retrieved for case', 'policy');
   });
 
   const nodeIds = new Set(nodes.map((node) => node.id));
-  return { nodes, edges: edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)), width: GRAPH_WIDTH, height: height + 24 };
+  return { nodes, edges: edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)), width: fullscreen ? 1170 : GRAPH_WIDTH, height: height + 24 };
 }
 
 function kindLabel(kind: NodeKind): string {
@@ -218,9 +233,12 @@ function EvidenceGraph({ report }: { report: InvestigationResponse }) {
   const [showPolicies, setShowPolicies] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchIndex, setSearchIndex] = useState(0);
-  const graph = useMemo(() => makeGraph(report), [report]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const graph = useMemo(() => makeGraph(report, isFullscreen), [report, isFullscreen]);
   const [viewport, setViewport] = useState<GraphViewport>(() => ({ x: 0, y: 0, width: graph.width, height: graph.height }));
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; viewX: number; viewY: number; viewWidth: number; viewHeight: number; nodeId: string | null; didMove: boolean } | null>(null);
+  const fullscreenToggleRef = useRef<HTMLButtonElement>(null);
+  const fullscreenCloseRef = useRef<HTMLButtonElement>(null);
   const visibleNodes = graph.nodes.filter((node) => (showEvidence || node.kind !== 'evidence') && (showPolicies || node.kind !== 'policy'));
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
   const visibleEdges = graph.edges.filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target));
@@ -229,6 +247,26 @@ function EvidenceGraph({ report }: { report: InvestigationResponse }) {
   const selectedNode = visibleNodes.find((node) => node.id === activeSelectedNodeId);
   const connectedNodeIds = new Set(visibleEdges.flatMap((edge) => edge.source === activeSelectedNodeId ? [edge.target] : edge.target === activeSelectedNodeId ? [edge.source] : []));
   const matches = searchQuery.trim() ? visibleNodes.filter((node) => `${node.title} ${node.subtitle} ${kindLabel(node.kind)}`.toLowerCase().includes(searchQuery.trim().toLowerCase())) : [];
+
+  useEffect(() => {
+    setViewport({ x: 0, y: 0, width: graph.width, height: graph.height });
+  }, [graph]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsFullscreen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    fullscreenCloseRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+      window.requestAnimationFrame(() => fullscreenToggleRef.current?.focus());
+    };
+  }, [isFullscreen]);
 
   function focusNode(node: GraphNode): void {
     setSelectedNodeId(node.id);
@@ -278,8 +316,9 @@ function EvidenceGraph({ report }: { report: InvestigationResponse }) {
   }
 
   return (
-    <div className="graph-tab-body">
-      <div className="graph-intro">
+    <div className={`graph-tab-body ${isFullscreen ? 'is-fullscreen' : ''}`} role={isFullscreen ? 'dialog' : undefined} aria-modal={isFullscreen || undefined} aria-labelledby={isFullscreen ? 'graph-fullscreen-title' : undefined} tabIndex={isFullscreen ? -1 : undefined}>
+      {isFullscreen && <div className="graph-fullscreen-bar"><div className="graph-fullscreen-heading"><span className="eyebrow"><Network size={13} /> CASE GRAPH <i /> FULL SCREEN</span><strong id="graph-fullscreen-title">{report.alert.alert_id} <span>·</span> {report.alert.headline}</strong><small>Explore the recorded connections, evidence and policy matches for this alert.</small></div><button ref={fullscreenCloseRef} type="button" className="graph-control-button graph-fullscreen-close" onClick={() => setIsFullscreen(false)}><Minimize2 size={15} /> Return to investigation <kbd>Esc</kbd></button></div>}
+      <div className={`graph-intro ${isFullscreen ? 'graph-intro-fullscreen' : ''}`}>
         <div className="graph-intro-icon"><Network size={20} /></div>
         <div><span className="eyebrow">CASE EVIDENCE MAP</span><h3>How the recorded facts connect</h3><p>Search to jump to a node, drag anywhere in the graph to move around, or use zoom controls to explore the case.</p></div>
       </div>
@@ -295,7 +334,7 @@ function EvidenceGraph({ report }: { report: InvestigationResponse }) {
           {matches.length > 1 && <button type="button" className="graph-control-button graph-next-match" onClick={() => focusSearchResult(searchIndex + 1)} aria-label={`Focus next match, ${matches.length} results`}>Next {searchIndex + 1}/{matches.length}</button>}
           <span className="graph-search-status" role="status">{searchQuery ? `${matches.length} match${matches.length === 1 ? '' : 'es'}` : `${visibleNodes.length} nodes`}</span>
         </form>
-        <div className="graph-zoom-controls" role="group" aria-label="Graph zoom controls"><button type="button" className="graph-control-button graph-zoom-button" onClick={() => zoomBy(0.8)} disabled={viewport.width <= graph.width * 0.41} aria-label="Zoom in">+</button><button type="button" className="graph-control-button graph-zoom-button" onClick={() => zoomBy(1.25)} disabled={viewport.width >= graph.width * 0.99} aria-label="Zoom out">−</button><button type="button" className="graph-control-button" onClick={() => setViewport({ x: 0, y: 0, width: graph.width, height: graph.height })}>Fit graph</button></div>
+        <div className="graph-zoom-controls" role="group" aria-label="Graph zoom controls"><button type="button" className="graph-control-button graph-zoom-button" onClick={() => zoomBy(0.8)} disabled={viewport.width <= graph.width * 0.41} aria-label="Zoom in">+</button><button type="button" className="graph-control-button graph-zoom-button" onClick={() => zoomBy(1.25)} disabled={viewport.width >= graph.width * 0.99} aria-label="Zoom out">−</button><button type="button" className="graph-control-button" onClick={() => setViewport({ x: 0, y: 0, width: graph.width, height: graph.height })}>Fit graph</button><button ref={fullscreenToggleRef} type="button" className="graph-control-button graph-expand-button" onClick={() => setIsFullscreen(true)} aria-label="Expand graph to full screen"><Maximize2 size={14} /> Full screen</button></div>
       </div>
       <div className="graph-canvas-scroll" role="region" aria-label="Scrollable case evidence graph" tabIndex={0}>
         <svg className={`evidence-graph-svg ${panRef.current ? 'is-panning' : ''}`} viewBox={`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`} role="img" tabIndex={0} aria-labelledby="evidence-graph-title evidence-graph-desc" aria-label="Interactive case graph. Drag to pan or use arrow keys to move around." onKeyDown={(event) => {
@@ -310,7 +349,7 @@ function EvidenceGraph({ report }: { report: InvestigationResponse }) {
           <title id="evidence-graph-title">Evidence relationships for alert {report.alert.alert_id}</title>
           <desc id="evidence-graph-desc">An interactive graph connects the alert with its customer, transaction events, devices, locations, beneficiaries, evidence signals and retrieved policies. Connections only represent recorded or explicitly labelled system relationships.</desc>
           <defs><marker id="graph-arrow-record" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a8b6c9" /></marker><marker id="graph-arrow-evidence" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#d99b91" /></marker><marker id="graph-arrow-policy" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#a99bd1" /></marker></defs>
-          <text className="graph-column-label" x="26" y="27">CASE</text><text className="graph-column-label" x="220" y="27">CUSTOMER &amp; ACTIVITY</text><text className="graph-column-label" x="430" y="27">RELATED ENTITIES</text><text className="graph-column-label" x="640" y="27">ASSESSMENT</text>
+          <text className="graph-column-label" x="26" y="27">CASE</text><text className="graph-column-label" x="220" y="27">CUSTOMER &amp; ACTIVITY</text><text className="graph-column-label" x={isFullscreen ? '420' : '430'} y="27">RELATED ENTITIES</text><text className="graph-column-label" x={isFullscreen ? '630' : '640'} y="27">{isFullscreen ? 'EVIDENCE' : 'ASSESSMENT'}</text>{isFullscreen && <text className="graph-column-label" x="990" y="27">POLICY MATCHES</text>}
           {visibleEdges.map((edge) => {
             const source = nodes.get(edge.source)!;
             const target = nodes.get(edge.target)!;
@@ -323,13 +362,13 @@ function EvidenceGraph({ report }: { report: InvestigationResponse }) {
             const marker = edge.kind === 'record' ? 'url(#graph-arrow-record)' : edge.kind === 'evidence' ? 'url(#graph-arrow-evidence)' : 'url(#graph-arrow-policy)';
             const isConnected = edge.source === activeSelectedNodeId || edge.target === activeSelectedNodeId;
             const isNeighborEdge = !activeSelectedNodeId || isConnected;
-            return <g key={edge.id} className={`graph-edge graph-edge-${edge.kind} ${isNeighborEdge ? '' : 'is-dimmed'}`}><path d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2 - 5} ${y2}`} fill="none" stroke={color} strokeWidth={isConnected ? '2.5' : '1.5'} strokeDasharray={edge.kind === 'record' ? undefined : '4 5'} markerEnd={marker} /><title>{`${nodes.get(edge.source)?.title} ${edge.label} ${nodes.get(edge.target)?.title}`}</title></g>;
+            return <g key={edge.id} className={`graph-edge graph-edge-${edge.kind} ${!isFullscreen && !isNeighborEdge ? 'is-dimmed' : ''}`}><path d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2 - 5} ${y2}`} fill="none" stroke={color} strokeWidth={isConnected ? '2.5' : '1.5'} strokeDasharray={edge.kind === 'record' ? undefined : '4 5'} markerEnd={marker} /><title>{`${nodes.get(edge.source)?.title} ${edge.label} ${nodes.get(edge.target)?.title}`}</title></g>;
           })}
           {visibleNodes.map((node) => {
             const color = nodeColor(node.kind);
             const isSelected = activeSelectedNodeId === node.id;
             const isNeighbor = connectedNodeIds.has(node.id);
-            return <g key={node.id} data-node-id={node.id} className={`graph-node graph-node-${node.kind} ${isSelected ? 'is-selected' : ''} ${activeSelectedNodeId && !isSelected && !isNeighbor ? 'is-dimmed' : ''}`} role="button" tabIndex={0} aria-label={`${kindLabel(node.kind)}: ${node.title}. ${node.subtitle}. Select for details.`} aria-pressed={isSelected} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (isSelected) setSelectedNodeId(null); else focusNode(node); } }}>
+            return <g key={node.id} data-node-id={node.id} className={`graph-node graph-node-${node.kind} ${isSelected ? 'is-selected' : ''} ${!isFullscreen && activeSelectedNodeId && !isSelected && !isNeighbor ? 'is-dimmed' : ''}`} role="button" tabIndex={0} aria-label={`${kindLabel(node.kind)}: ${node.title}. ${node.subtitle}. Select for details.`} aria-pressed={isSelected} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (isSelected) setSelectedNodeId(null); else focusNode(node); } }}>
               <rect x={node.x} y={node.y} width={node.width} height={node.height} rx="12" fill={color.fill} stroke={isSelected ? '#316bda' : color.stroke} strokeWidth={isSelected ? '2.5' : '1.4'} />
               <circle cx={node.x + 16} cy={node.y + 18} r="4" fill={node.severity === 'high' ? '#d35e59' : node.severity === 'medium' ? '#d69b43' : color.stroke} />
               <text x={node.x + 27} y={node.y + 21} className="graph-node-kind">{kindLabel(node.kind).toUpperCase()}</text>
