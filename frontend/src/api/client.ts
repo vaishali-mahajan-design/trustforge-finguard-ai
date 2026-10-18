@@ -1,33 +1,35 @@
-import type { AlertDetail, AlertSummary, AnalystDecision, Investigation } from './types'
-import { API_ENDPOINTS, API_BASE_URL, apiUrl } from './config'
+import { API_BASE_URL, endpoints } from './config';
+import type { AlertDetail, AlertSummary, AnalystDecision, AnalystDecisionRequest, HealthResponse, InvestigationResponse } from './types';
+
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  let response: Response
+  let response: Response;
   try {
-    response = await fetch(apiUrl(path), {
+    response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
-    })
+      headers: { Accept: 'application/json', ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers },
+    });
   } catch {
-    throw new Error(`Could not reach FinGuard API at ${API_BASE_URL}. Check that the backend is running and the API connection settings are correct.`)
+    throw new ApiError(0, 'Cannot connect to the FinGuard API. Confirm that FastAPI is running and the API URL is configured.');
   }
   if (!response.ok) {
-    let message = `Request failed (${response.status})`
-    try {
-      const body = await response.json() as { detail?: string }
-      if (body.detail) message = body.detail
-    } catch { /* The API may return a non-JSON error page. */ }
-    throw new Error(message)
+    const body: unknown = await response.json().catch(() => null);
+    const detail = body && typeof body === 'object' && 'detail' in body ? String(body.detail) : response.statusText;
+    throw new ApiError(response.status, `API ${response.status}: ${detail}`);
   }
-  return response.json() as Promise<T>
+  return response.json() as Promise<T>;
 }
 
 export const api = {
-  health: () => request<{ status: string; ai_mode: string }>(API_ENDPOINTS.health),
-  alerts: () => request<AlertSummary[]>(API_ENDPOINTS.alerts),
-  alert: (id: string) => request<AlertDetail>(API_ENDPOINTS.alert(id)),
-  investigate: (id: string) => request<Investigation>(API_ENDPOINTS.investigate(id), { method: 'POST' }),
-  investigation: (id: string) => request<Investigation>(API_ENDPOINTS.investigation(id)),
-  decide: (id: string, body: { action: string; rationale: string; analyst: string }) =>
-    request<AnalystDecision>(API_ENDPOINTS.decision(id), { method: 'POST', body: JSON.stringify(body) }),
-}
+  health: () => request<HealthResponse>(endpoints.health),
+  alerts: () => request<AlertSummary[]>(endpoints.alerts),
+  alert: (id: string) => request<AlertDetail>(endpoints.alert(id)),
+  investigate: (id: string) => request<InvestigationResponse>(endpoints.investigate(id), { method: 'POST' }),
+  decide: (id: string, decision: AnalystDecisionRequest) => request<AnalystDecision>(endpoints.decision(id), { method: 'POST', body: JSON.stringify(decision) }),
+};
