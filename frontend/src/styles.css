@@ -43,3 +43,28 @@
 .graph-tab-body.is-fullscreen .graph-relationships{margin-top:9px}
 .graph-tab-body.is-fullscreen .graph-accessible-list{margin-top:9px;padding-top:8px}
 @media(max-width:700px){.graph-tab-body.is-fullscreen{padding:13px}.graph-fullscreen-heading strong{max-width:58vw;font-size:13px}.graph-fullscreen-heading small{max-width:62vw;line-height:1.5}.graph-fullscreen-close{height:32px;padding:0 8px}.graph-fullscreen-close kbd{display:none}.graph-tab-body.is-fullscreen .graph-toolbar{align-items:flex-start}.graph-tab-body.is-fullscreen .graph-canvas-scroll{height:clamp(280px,calc(100vh - 420px),500px);flex:none}.graph-tab-body.is-fullscreen .evidence-graph-svg{min-width:830px}.graph-tab-body.is-fullscreen .graph-detail-row{grid-template-columns:1fr}.graph-tab-body.is-fullscreen .graph-relationships{max-height:130px;overflow:auto}}
+
+
+/* Keep investigation content within the viewport at laptop sizes and browser zoom. */
+.app-shell,.main-area,.content,.workspace-grid,.queue-panel,.report-panel,.tab-body,.graph-tab-body{min-width:0;max-width:100%}
+.workspace-grid{width:100%}
+.report-header,.recommendation-main,.ai-status,.decision-cta{min-width:0}
+.report-heading-left,.recommendation-main>div,.ai-status-left,.ai-status-left>div,.decision-cta>div{min-width:0}
+.report-header h2,.recommendation-main h3,.recommendation-main p,.analysis-summary,.hypothesis-card p,.counterfactual-card p,.decision-success p{overflow-wrap:anywhere}
+.report-tabs{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+.report-tabs button{white-space:nowrap;flex:none}
+.graph-canvas-scroll{width:100%;max-width:100%;min-width:0}
+.graph-tab-body.is-fullscreen{max-width:100vw}
+@media(max-width:1450px){
+  .workspace-grid{grid-template-columns:minmax(0,1fr)}
+  .queue-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .queue-item:nth-child(odd){border-right:1px solid #eff2f6}
+  .queue-items .queue-loading{grid-column:1/-1}
+}
+@media(max-width:540px){
+  .queue-items{grid-template-columns:minmax(0,1fr)}
+  .queue-item:nth-child(odd){border-right:0}
+  .ai-status{flex-wrap:wrap}
+  .recommendation-main{flex-wrap:wrap}
+  .report-meta{gap:8px}
+}
