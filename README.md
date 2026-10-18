@@ -5,7 +5,8 @@
 **Team:** TrustForge  
 **Event:** Google Cloud AI Builder Cup 2026  
 **Live demo:** https://trustforge-finguard-ai-2026.web.app  
-**Tested source branch:** [`demo-tested-frontend`](https://github.com/vaishali-mahajan-design/trustforge-finguard-ai/tree/demo-tested-frontend)
+**Submitted source:** [`main`](https://github.com/vaishali-mahajan-design/trustforge-finguard-ai/tree/main)  
+**Demo video:** https://youtu.be/v29rVu1xjx4
 
 ## What is FinGuard AI?
 
@@ -18,7 +19,7 @@ FinGuard AI is a **human-in-the-loop fraud investigation copilot** that helps an
 Open **https://trustforge-finguard-ai-2026.web.app**.
 
 1. Select **FG-1042** to investigate possible account takeover involving a new device, a new beneficiary, unusual activity, and a blocked transfer attempt.
-2. Review the deterministic evidence, primary and alternative hypotheses, policy basis, counterfactual, and suggested next step.
+2. Review the deterministic evidence, primary and alternative hypotheses, policy basis, counterfactual, and suggested next step. Open **Case graph** to explore linked transactions, entities, evidence, and policies.
 3. Record a human decision — **CLEAR**, **REQUEST_VERIFICATION**, or **ESCALATE** — with a rationale.
 4. Select **FG-1007** to compare a potentially legitimate international transaction supported by travel context.
 5. Optionally download an investigation report as JSON.
@@ -30,6 +31,7 @@ Open **https://trustforge-finguard-ai-2026.web.app**.
 - **Evidence before inference:** Amount anomaly, device change, geography, velocity, beneficiary changes, international history, and travel context are derived from case data rather than invented by the model.
 - **Grounded explanations:** Gemini receives the computed evidence and retrieved policy excerpts, and must cite supplied evidence and policy IDs. The backend validates referenced IDs; an analyst must still review narrative accuracy.
 - **Competing hypotheses:** The output includes a primary explanation, an alternative explanation, contradictory or missing evidence, and a counterfactual.
+- **Interactive Case Evidence Map:** The graph connects the alert, customer, transactions, devices, beneficiaries, evidence, and policy matches, with zoom and full-screen exploration.
 - **Human accountability:** Recommendations are advisory; the analyst explicitly selects an action and records a rationale.
 - **Controlled public demo:** A quota-limited gateway invokes a private Cloud Run backend. Only two synthetic case IDs are exposed.
 
@@ -158,4 +160,5 @@ Persist investigation/decision audit trails; add analyst authentication and role
 
 ---
 
-**Built by TrustForge for the Google Cloud AI Builder Cup 2026.**
+**Built by TrustForge for the Google Cloud AI Builder Cup 2026.**  
+Vaishali Mahajan — Project Lead & Developer · Amruta Sandela — Team Member.
